@@ -1,8 +1,8 @@
 boto3
 python-dotenv
-pandas
+pandas==1.5.3
 streamlit
 openai
 instructor
 langfuse
-pycaret
+pycaret==3.3.2
