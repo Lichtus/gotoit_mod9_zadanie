@@ -1,8 +1,8 @@
 boto3
 python-dotenv
 pandas==1.5.3
-streamlit
-openai
-instructor
-langfuse
+streamlit==1.43.2
+openai==1.107.1
+instructor==1.3.7
+langfuse==2.51.4
 pycaret==3.3.2
