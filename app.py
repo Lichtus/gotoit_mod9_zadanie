@@ -23,6 +23,13 @@ WELCOME_MESSAGE = (
     "a oszacuję Twój czas na półmaratonie."
 )
 
+# Granice zgodne z zakresem danych, na których trenowany był model — poza nimi
+# predykcja byłaby czystą ekstrapolacją (patrz training_pipeline.ipynb, filtr wieku
+# 15-90 lat; czas na 5 km: <12 min to poziom rekordów świata, >50 min to już marsz,
+# nie bieg, więc model biegaczy się do tego nie nadaje).
+AGE_MIN, AGE_MAX = 15, 90
+TIME_5K_MIN_MINUTES, TIME_5K_MAX_MINUTES = 12, 50
+
 
 class ExtractedInfo(BaseModel):
     gender: Optional[Literal["M", "K"]] = Field(
@@ -72,6 +79,19 @@ def missing_field_labels(info: dict) -> list[str]:
     return [FIELD_LABELS[field] for field, value in info.items() if value is None]
 
 
+def field_error(field: str, value) -> Optional[str]:
+    if field == "age" and not (AGE_MIN <= value <= AGE_MAX):
+        return f"wiek {value} lat wygląda na nierealny (obsługuję {AGE_MIN}-{AGE_MAX} lat)"
+    if field == "time_5k_minutes" and not (
+        TIME_5K_MIN_MINUTES <= value <= TIME_5K_MAX_MINUTES
+    ):
+        return (
+            f"czas na 5 km ({value:g} min) wygląda na nierealny "
+            f"(obsługuję {TIME_5K_MIN_MINUTES}-{TIME_5K_MAX_MINUTES} min)"
+        )
+    return None
+
+
 def reset_conversation():
     st.session_state.messages = [{"role": "assistant", "content": WELCOME_MESSAGE}]
     st.session_state.collected_info = {"gender": None, "age": None, "time_5k_minutes": None}
@@ -100,13 +120,23 @@ else:
         with st.spinner("Analizuję..."):
             extracted = extract_info(user_text)
 
+        errors = []
         for field in st.session_state.collected_info:
             value = getattr(extracted, field)
-            if value is not None:
+            if value is None:
+                continue
+            error = field_error(field, value)
+            if error:
+                errors.append(error)
+            else:
                 st.session_state.collected_info[field] = value
 
         missing = missing_field_labels(st.session_state.collected_info)
-        if missing:
+        if errors:
+            reply = "Uwaga: " + "; ".join(errors) + "."
+            if missing:
+                reply += f" Poza tym brakuje mi: {', '.join(missing)}."
+        elif missing:
             reply = f"Dzięki! Brakuje mi jeszcze: {', '.join(missing)}. Podasz?"
         else:
             info = st.session_state.collected_info
